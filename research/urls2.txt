@@ -1,0 +1,6 @@
+jpx_inv_2016.html https://www.jpx.co.jp/markets/statistics-equities/investor-type/00-00-archives-10.html
+jpx_inv_2021.html https://www.jpx.co.jp/markets/statistics-equities/investor-type/00-00-archives-05.html
+jpx_margin05.html https://www.jpx.co.jp/markets/statistics-equities/margin/05.html
+jpx_margin04.html https://www.jpx.co.jp/markets/statistics-equities/margin/04.html
+inv_sample_new.xlsx https://www.jpx.co.jp/markets/statistics-equities/investor-type/t13vrt000002k0uf-att/stock_1_w_20261019_20261023.xlsx
+boj_2026.html https://www.boj.or.jp/mopo/mpmsche_minu/index.htm
