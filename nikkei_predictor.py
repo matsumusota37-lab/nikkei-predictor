@@ -290,6 +290,55 @@ def update_log(pred_row: dict, nk_close: pd.Series) -> pd.DataFrame:
     return log
 
 
+# ---------------------------------------------------------------- 日付・表示
+def is_tse_holiday(d) -> bool:
+    """東証の休場日（土日・祝日・年末年始 12/31〜1/3）"""
+    d = pd.Timestamp(d)
+    if d.weekday() >= 5 or (d.month == 12 and d.day == 31) or (d.month == 1 and d.day <= 3):
+        return True
+    try:
+        import jpholiday
+        return bool(jpholiday.is_holiday(d.date()))
+    except ImportError:
+        return False
+
+
+def next_business_day(d) -> pd.Timestamp:
+    d = pd.Timestamp(d) + pd.Timedelta(days=1)
+    while is_tse_holiday(d):
+        d += pd.Timedelta(days=1)
+    return d
+
+
+def jp_date(d) -> str:
+    d = pd.Timestamp(d)
+    return f"{d.month}/{d.day}({'月火水木金土日'[d.weekday()]})"
+
+
+_MARKET_JA = {"gspc": "S&P500", "dji": "NYダウ", "ixic": "ナスダック", "sox": "SOX半導体",
+              "vix": "VIX", "nkd_f": "CME日経先物", "jpy_x": "ドル円", "eurjpy_x": "ユーロ円",
+              "tnx": "米10年金利", "cl_f": "WTI原油", "gc_f": "金", "hsi": "ハンセン",
+              "000001_ss": "上海総合"}
+_TECH_JA = {"nk_rsi14": "日経RSI(14)", "nk_macd": "日経MACD", "nk_macd_hist": "日経MACDヒストグラム",
+            "nk_bb_pctb": "日経ボリンジャー%B", "nk_stoch14": "日経ストキャス%K", "nk_atr14": "日経ATR",
+            "nk_vol20": "日経20日ボラ", "nk_vol_ratio": "日経ボラ比(短期/長期)",
+            "nk_ma5_25": "日経5日線/25日線", "nk_volume_z": "日経出来高(20日比)", "vix_level": "VIX水準"}
+
+
+def feature_ja(name: str) -> str:
+    if name in _TECH_JA:
+        return _TECH_JA[name]
+    if name.startswith("nk_ret"):
+        return f"日経{name[6:]}日リターン"
+    if name.startswith("nk_kairi"):
+        return f"日経{name[8:]}日線乖離率"
+    for k, ja in _MARKET_JA.items():
+        if name.startswith(k + "_ret"):
+            n = name[len(k) + 4:]
+            return f"{ja} {'前日' if n == '1' else n + '日'}リターン"
+    return name
+
+
 # ---------------------------------------------------------------- メール
 def send_mail(subject: str, body: str) -> None:
     user, pw, to = os.getenv("GMAIL_USER"), os.getenv("GMAIL_APP_PASSWORD"), os.getenv("MAIL_TO")
@@ -351,7 +400,11 @@ def main() -> None:
     joblib.dump({"model": mdl, "features": list(X.columns), "markets": sel}, OUT_DIR / "model.joblib")
 
     base_date = idx[-1].strftime("%Y-%m-%d")
+    judge_day = next_business_day(idx[-1])          # 判定日（この朝に予想する）
+    target_day = next_business_day(judge_day)       # 予想対象日（この日の引値を予想）
     log = update_log({"run_at": datetime.now(JST).strftime("%Y-%m-%d %H:%M"), "base_date": base_date,
+                      "judge_date": judge_day.strftime("%Y-%m-%d"),
+                      "target_date": target_day.strftime("%Y-%m-%d"),
                       "base_close": round(float(nk["Close"].iloc[-1]), 2), "prob_up": round(prob_up, 4),
                       "pred_up": int(prob_up > 0.5), "model": best}, nk["Close"])
 
@@ -362,14 +415,21 @@ def main() -> None:
     direction = "上昇" if prob_up > 0.5 else "下落"
     conf = abs(prob_up - 0.5) * 2
 
+    base_close = float(nk["Close"].iloc[-1])
+    subject = (f"[日経予測] {jp_date(target_day)}の引値は{jp_date(idx[-1])}の引値より"
+               f"{direction}  (上昇確率 {prob_up:.0%})")
     lines = [
-        f"■ 日経平均 {HORIZON}営業日後の騰落予測{'（デモ）' if args.demo else ''}",
-        f"基準日: {base_date}  終値 {nk['Close'].iloc[-1]:,.2f}",
-        f"予測: {direction}  （上昇確率 {prob_up:.1%} / 確信度 {conf:.0%}）",
+        f"■ 日経平均 翌営業日の引値予想{'（デモ）' if args.demo else ''}",
+        f"判定日    : {jp_date(judge_day)} 朝",
+        f"予想対象  : {jp_date(target_day)} の引値",
+        f"比較する値: {jp_date(idx[-1])} の引値 {base_close:,.2f} 円",
+        "",
+        f"予測: {direction}  （{jp_date(target_day)}の引値が {base_close:,.0f} 円を上回る確率 {prob_up:.1%}"
+        f" / 確信度 {conf:.0%}）",
         f"使用モデル: {best}",
         "",
         "■ 予測を押し上げ(+)/押し下げ(-)している主な要因（ロジスティック回帰）",
-        *[f"  {n:<22} {v:+.3f}" for n, v in drivers],
+        *[f"  {feature_ja(n)}: {v:+.3f}" for n, v in drivers],
         "",
         "■ 過去5年分のウォークフォワード検証（各250営業日×5回）",
         *[f"  {m}: 正解率 {r.accuracy:.1%} / AUC {r.auc:.3f} / 常に多数派を当てた場合 {r.baseline:.1%}"
@@ -389,11 +449,12 @@ def main() -> None:
     corr_tbl.to_csv(OUT_DIR / "market_correlation.csv")
     wf.to_csv(OUT_DIR / "walk_forward.csv", index=False)
     (OUT_DIR / "latest.json").write_text(json.dumps(
-        {"base_date": base_date, "prob_up": prob_up, "direction": direction, "model": best,
-         "markets": sel}, ensure_ascii=False, indent=2), encoding="utf-8")
+        {"base_date": base_date, "judge_date": judge_day.strftime("%Y-%m-%d"),
+         "target_date": target_day.strftime("%Y-%m-%d"), "prob_up": prob_up, "direction": direction,
+         "model": best, "markets": sel, "subject": subject}, ensure_ascii=False, indent=2), encoding="utf-8")
 
     if not args.no_mail and not args.demo:
-        send_mail(f"[日経予測] {base_date}基準 {HORIZON}営業日後: {direction} ({prob_up:.0%})", report)
+        send_mail(subject, report)
 
 
 if __name__ == "__main__":
