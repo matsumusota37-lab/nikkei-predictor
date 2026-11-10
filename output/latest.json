@@ -1,0 +1,14 @@
+{
+  "base_date": "2026-11-09",
+  "prob_up": 0.9930014463451535,
+  "direction": "上昇",
+  "model": "ロジスティック回帰",
+  "markets": [
+    "^SOX",
+    "^IXIC",
+    "^GSPC",
+    "^VIX",
+    "^DJI",
+    "NKD=F"
+  ]
+}

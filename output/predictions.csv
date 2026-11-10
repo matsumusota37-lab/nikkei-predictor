@@ -1,0 +1,2 @@
+run_at,base_date,base_close,prob_up,pred_up,model,actual_up,hit
+2026-11-10 19:10,2026-11-09,58775.5,0.993,1,ロジスティック回帰,,

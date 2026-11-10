@@ -1,0 +1,32 @@
+name: nikkei-daily-prediction
+
+on:
+  schedule:
+    - cron: "30 21 * * 0-4"   # UTC 日〜木 21:30 = 日本時間 月〜金 6:30
+  workflow_dispatch:           # 手動実行ボタン
+
+permissions:
+  contents: write
+
+jobs:
+  predict:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - name: データ更新・再学習・予測
+        env:
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          MAIL_TO: ${{ secrets.MAIL_TO }}
+        run: python nikkei_predictor.py
+      - name: 更新したデータと予測ログを保存
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add data output
+          git commit -m "daily update $(date -u +%F)" || echo "no changes"
+          git push
