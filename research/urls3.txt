@@ -1,0 +1,5 @@
+inv_sample_old.xls https://www.jpx.co.jp/markets/statistics-equities/investor-type/nlsgeu000001ejo5-att/stock_val_1_160102.xls
+inv_sample_2021.xls https://www.jpx.co.jp/markets/statistics-equities/investor-type/nlsgeu0000061zyg-att/stock_val_1_211201.xls
+jpx_inv_2022.html https://www.jpx.co.jp/markets/statistics-equities/investor-type/00-00-archives-04.html
+margin_mtgk.xls https://www.jpx.co.jp/markets/statistics-equities/margin/tvdivq0000001rq1-att/20260925_mtgk.xls
+margin_cur.xlsx https://www.jpx.co.jp/markets/statistics-equities/margin/tvdivq0000001rk9-att/20261106_mtcurrent.xlsx
