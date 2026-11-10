@@ -3,7 +3,7 @@
 日経平均株価 2営業日後 騰落予測モデル
 =====================================
 
-予測対象 : 直近の日経平均終値（基準日 t）に対し、2営業日後（t+2）の終値が上か下か
+予測対象 : 判定日（基準日 t の翌営業日）の朝に、翌営業日（t+2）の引値が判定日（t+1）の引値より上か下か
 実行時刻 : 東京市場の寄付き前（NY市場の引け後、目安 6:30〜8:30 JST）
 特徴量   : 日経平均のテクニカル指標 + 日経平均と相関の高い海外マーケットデータ
 モデル   : ロジスティック回帰（回帰分析ベースの分類）と勾配ブースティングを
@@ -279,7 +279,8 @@ def update_log(pred_row: dict, nk_close: pd.Series) -> pd.DataFrame:
     for _, r in log.iterrows():
         if r["base_date"] in dates and dates.index(r["base_date"]) + HORIZON < len(dates):
             i = dates.index(r["base_date"])
-            a = int(nk_close.iloc[i + HORIZON] > nk_close.iloc[i])
+            # 判定日(i+1)の引値 → 翌営業日(i+2)の引値
+            a = int(nk_close.iloc[i + HORIZON] > nk_close.iloc[i + HORIZON - 1])
             actual.append(a)
             hit.append(int(a == int(r["pred_up"])))
         else:
@@ -372,7 +373,8 @@ def main() -> None:
 
     # 2) 特徴量とターゲット
     X_all = technical_features(nk).join(market_features(prices, mret, sel, idx))
-    y_all = (nk["Close"].shift(-HORIZON) > nk["Close"]).astype(float)
+    # ターゲット: 判定日(基準日の翌営業日)の引値に対し、その翌営業日の引値が上か
+    y_all = (nk["Close"].shift(-HORIZON) > nk["Close"].shift(-(HORIZON - 1))).astype(float)
     y_all[nk["Close"].shift(-HORIZON).isna()] = np.nan
 
     # 予測の基準日 = 採用市場がすべてその日の終値まで揃っている最新の日経営業日
@@ -416,15 +418,16 @@ def main() -> None:
     conf = abs(prob_up - 0.5) * 2
 
     base_close = float(nk["Close"].iloc[-1])
-    subject = (f"[日経予測] {jp_date(target_day)}の引値は{jp_date(idx[-1])}の引値より"
+    subject = (f"[日経予測] {jp_date(target_day)}の引値は{jp_date(judge_day)}の引値より"
                f"{direction}  (上昇確率 {prob_up:.0%})")
     lines = [
         f"■ 日経平均 翌営業日の引値予想{'（デモ）' if args.demo else ''}",
         f"判定日    : {jp_date(judge_day)} 朝",
         f"予想対象  : {jp_date(target_day)} の引値",
-        f"比較する値: {jp_date(idx[-1])} の引値 {base_close:,.2f} 円",
+        f"比較する値: {jp_date(judge_day)} の引値（当日の引けで確定）",
+        f"参考      : 前日 {jp_date(idx[-1])} の引値 {base_close:,.2f} 円",
         "",
-        f"予測: {direction}  （{jp_date(target_day)}の引値が {base_close:,.0f} 円を上回る確率 {prob_up:.1%}"
+        f"予測: {direction}  （{jp_date(target_day)}の引値が{jp_date(judge_day)}の引値を上回る確率 {prob_up:.1%}"
         f" / 確信度 {conf:.0%}）",
         f"使用モデル: {best}",
         "",
