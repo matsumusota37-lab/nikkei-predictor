@@ -1,0 +1,17 @@
+fomc_cal.html https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm
+fomc_2012.html https://www.federalreserve.gov/monetarypolicy/fomchistorical2012.htm
+fomc_2013.html https://www.federalreserve.gov/monetarypolicy/fomchistorical2013.htm
+fomc_2014.html https://www.federalreserve.gov/monetarypolicy/fomchistorical2014.htm
+fomc_2015.html https://www.federalreserve.gov/monetarypolicy/fomchistorical2015.htm
+fomc_2016.html https://www.federalreserve.gov/monetarypolicy/fomchistorical2016.htm
+fomc_2017.html https://www.federalreserve.gov/monetarypolicy/fomchistorical2017.htm
+fomc_2018.html https://www.federalreserve.gov/monetarypolicy/fomchistorical2018.htm
+fomc_2019.html https://www.federalreserve.gov/monetarypolicy/fomchistorical2019.htm
+fomc_2020.html https://www.federalreserve.gov/monetarypolicy/fomchistorical2020.htm
+boj_index.html https://www.boj.or.jp/mopo/mpmsche_minu/index.htm
+boj_past.html https://www.boj.or.jp/mopo/mpmsche_minu/past.htm
+boj_deci.html https://www.boj.or.jp/mopo/mpmdeci/index.htm
+jpx_inv.html https://www.jpx.co.jp/markets/statistics-equities/investor-type/index.html
+jpx_margin.html https://www.jpx.co.jp/markets/statistics-equities/margin/index.html
+alfred_payems.html https://alfred.stlouisfed.org/series?seid=PAYEMS
+alfred_cpi.html https://alfred.stlouisfed.org/series?seid=CPIAUCSL

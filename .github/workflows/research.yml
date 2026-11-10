@@ -1,0 +1,20 @@
+name: research-fetch
+on:
+  workflow_dispatch:
+    inputs:
+      urls:
+        description: "URLリストのファイル（research/ 内）"
+        default: "urls.txt"
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: 取得
+        working-directory: research
+        run: ./fetch_raw.sh "${{ inputs.urls }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: raw
+          path: research/raw
+          retention-days: 3
