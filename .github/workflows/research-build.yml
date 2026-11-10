@@ -1,0 +1,28 @@
+name: research-build
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install pandas requests openpyxl xlrd
+      - name: JPX週次データを取得・集計
+        working-directory: research
+        run: python build_extra.py 2>&1 | tee build_log.txt
+      - name: 結果を research-raw ブランチに保存
+        run: |
+          mkdir -p /tmp/out && cp research/extra/*.csv research/build_log.txt /tmp/out/
+          git config user.name "github-actions"; git config user.email "actions@github.com"
+          git checkout --orphan research-raw
+          git rm -rfq .
+          cp -r /tmp/out/. .
+          git add -A
+          git commit -qm "extra build $(date -u +%FT%TZ)"
+          git push -fq origin research-raw
