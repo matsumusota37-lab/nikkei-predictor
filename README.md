@@ -37,6 +37,9 @@ python nikkei_predictor.py          # 本番（初回は2012年以降を取得�
 3. Actions タブで「Run workflow」を押して初回実行
 4. 以後、平日 6:30（日本時間）に自動実行（GitHub側で10〜30分遅れることがあります）
 
+## 値動き注意
+予想対象日が「米雇用統計の翌営業日（第1金曜で近似）」「FOMC結果の翌朝」「メジャーSQ」に当たる日は、件名に【値動き注意】を付け、本文に理由を表示します。FOMC・日銀の日程は `data/events.csv`（2027年末まで）。年1回、FRBの公表日程に合わせて追記してください。
+
 ## 出力
 - `output/latest_report.txt` … 最新予測レポート（メール本文と同じ）
 - `output/predictions.csv` … 予測履歴と答え合わせ

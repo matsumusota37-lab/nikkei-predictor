@@ -329,6 +329,44 @@ def jp_date(d) -> str:
     return f"{d.month}/{d.day}({'月火水木金土日'[d.weekday()]})"
 
 
+def prev_or_same_business_day(d) -> pd.Timestamp:
+    d = pd.Timestamp(d)
+    while is_tse_holiday(d):
+        d -= pd.Timedelta(days=1)
+    return d
+
+
+def event_notes(target) -> list[str]:
+    """予想対象日が、値動きの大きくなりやすいイベントの影響日なら説明文を返す
+    - 米雇用統計: 毎月第1金曜（近似）の夜に発表 → 翌営業日
+    - FOMC: 米国の決定日の翌朝（日本時間）に結果 → その日以降の最初の営業日
+    - メジャーSQ: 3・6・9・12月の第2金曜（休場なら前営業日）
+    FOMC の日程は data/events.csv（年1回、FRBの公表日程に合わせて追記する）
+    """
+    t = pd.Timestamp(target).normalize()
+    notes = []
+    first = pd.Timestamp(t.year, t.month, 1) - pd.Timedelta(days=7)
+    for fri in pd.date_range(first, t, freq="WOM-1FRI"):
+        if next_business_day(fri) == t:
+            notes.append(f"米雇用統計（{jp_date(fri)}夜に発表、近似日）の結果を受ける日")
+    if t.month in (3, 6, 9, 12):
+        sq = pd.date_range(pd.Timestamp(t.year, t.month, 1), periods=1, freq="WOM-2FRI")[0]
+        if prev_or_same_business_day(sq) == t:
+            notes.append("メジャーSQ（先物・オプションの特別清算）の日")
+    path = DATA_DIR / "events.csv"
+    if path.exists():
+        ev = pd.read_csv(path, parse_dates=["date"])
+        for d in ev.loc[ev.event == "FOMC", "date"]:
+            eff = d + pd.Timedelta(days=1)
+            if is_tse_holiday(eff):
+                eff = next_business_day(eff)
+            if eff == t:
+                notes.append(f"FOMC（米国 {jp_date(d)} 決定）の結果を受ける日")
+        if ev.date.max() < t + pd.Timedelta(days=60):
+            notes.append("（data/events.csv の日程が残り少ないため、FOMC・日銀の日程の追加が必要です）")
+    return notes
+
+
 _MARKET_JA = {"gspc": "S&P500", "dji": "NYダウ", "ixic": "ナスダック", "sox": "SOX半導体",
               "vix": "VIX", "nkd_f": "CME日経先物", "jpy_x": "ドル円", "eurjpy_x": "ユーロ円",
               "tnx": "米10年金利", "cl_f": "WTI原油", "gc_f": "金", "hsi": "ハンセン",
@@ -435,8 +473,13 @@ def main() -> None:
     conf = abs(prob_up - 0.5) * 2
 
     base_close = float(nk["Close"].iloc[-1])
-    subject = (f"[日経予測] {jp_date(target_day)}の引値は{jp_date(judge_day)}の引値より"
-               f"{direction}  (上昇確率 {prob_up:.0%})")
+    notes = event_notes(target_day)
+    subject = (f"[日経予測]{'【値動き注意】' if notes else ''} {jp_date(target_day)}の引値は"
+               f"{jp_date(judge_day)}の引値より{direction}  (上昇確率 {prob_up:.0%})")
+    caution = ([f"■ 値動き注意: {jp_date(target_day)} は値動きが大きくなりやすい日です",
+                *[f"  ・{n}" for n in notes],
+                "  （2016年以降、こうした日の値動きは普段の1.1〜1.4倍。予想が外れたときの振れ幅も大きくなります）",
+                ""] if notes else [])
     lines = [
         f"■ 日経平均 翌営業日の引値予想{'（デモ）' if args.demo else ''}",
         f"判定日    : {jp_date(judge_day)} 朝",
@@ -448,6 +491,7 @@ def main() -> None:
         f" / 確信度 {conf:.0%}）",
         f"使用モデル: {best}",
         "",
+        *caution,
         "■ 予測を押し上げ(+)/押し下げ(-)している主な要因（ロジスティック回帰）",
         *[f"  {feature_ja(n)}: {v:+.3f}" for n, v in drivers],
         "",
