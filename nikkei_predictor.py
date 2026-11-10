@@ -188,6 +188,17 @@ def technical_features(nk: pd.DataFrame) -> pd.DataFrame:
     v = nk["Volume"].replace(0, np.nan)
     if v.notna().mean() > 0.8:
         f["nk_volume_z"] = np.log(v / v.rolling(20).mean())
+    # --- 追加テクニカル ---
+    for k in (1, 2, 3):
+        f[f"nk_lag{k}"] = lr.shift(k)                               # 数日前の日次リターン
+    f["nk_dow"] = nk.index.dayofweek                                 # 曜日
+    f["nk_month_end"] = (nk.index.days_in_month - nk.index.day <= 3).astype(int)  # 月末接近
+    upd = (lr > 0).astype(int)
+    f["nk_streak"] = upd.groupby((upd != upd.shift()).cumsum()).cumcount() * np.where(upd == 1, 1, -1)  # 連騰(+)/連敗(-)
+    f["nk_hi52"] = c / c.rolling(250).max() - 1                      # 52週高値からの距離
+    f["nk_lo52"] = c / c.rolling(250).min() - 1                      # 52週安値からの距離
+    f["nk_rsi_chg"] = f["nk_rsi14"].diff(3)                          # RSIの3日変化
+    f["nk_vol_chg"] = f["nk_vol20"].pct_change(5)                    # ボラの5日変化
     return f
 
 
@@ -233,6 +244,8 @@ def market_features(prices: dict, mret: dict, sel: list[str], idx) -> pd.DataFra
         f[f"{k}_ret5"] = (1 + r).rolling(5).apply(np.prod, raw=True) - 1
         if t == "^VIX":
             f["vix_level"] = align(prices[t]["Close"], idx)
+    if "NKD=F" in prices:   # CME日経先物と日経平均の価格差（夜間の先行き）
+        f["nk_fut_basis"] = align(prices["NKD=F"]["Close"], idx) / prices[TARGET]["Close"].reindex(idx) - 1
     return f
 
 
@@ -323,7 +336,11 @@ _MARKET_JA = {"gspc": "S&P500", "dji": "NYダウ", "ixic": "ナスダック", "s
 _TECH_JA = {"nk_rsi14": "日経RSI(14)", "nk_macd": "日経MACD", "nk_macd_hist": "日経MACDヒストグラム",
             "nk_bb_pctb": "日経ボリンジャー%B", "nk_stoch14": "日経ストキャス%K", "nk_atr14": "日経ATR",
             "nk_vol20": "日経20日ボラ", "nk_vol_ratio": "日経ボラ比(短期/長期)",
-            "nk_ma5_25": "日経5日線/25日線", "nk_volume_z": "日経出来高(20日比)", "vix_level": "VIX水準"}
+            "nk_ma5_25": "日経5日線/25日線", "nk_volume_z": "日経出来高(20日比)", "vix_level": "VIX水準",
+            "nk_lag1": "日経1日前のリターン", "nk_lag2": "日経2日前のリターン", "nk_lag3": "日経3日前のリターン",
+            "nk_dow": "曜日", "nk_month_end": "月末接近", "nk_streak": "日経連騰(+)/連敗(-)日数",
+            "nk_hi52": "52週高値からの距離", "nk_lo52": "52週安値からの距離", "nk_rsi_chg": "RSIの3日変化",
+            "nk_vol_chg": "ボラの5日変化", "nk_fut_basis": "CME日経先物と日経平均の差"}
 
 
 def feature_ja(name: str) -> str:
