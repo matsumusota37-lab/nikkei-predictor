@@ -98,6 +98,25 @@ def _download(ticker: str, start: str) -> pd.DataFrame:
     idx = pd.to_datetime(np.array(res["timestamp"]) + off, unit="s").normalize()
     df = pd.DataFrame({"Open": q["open"], "High": q["high"], "Low": q["low"],
                        "Close": q["close"], "Volume": q["volume"]}, index=idx, dtype=float)
+    df = df[~df.index.duplicated(keep="last")]
+    # Yahoo は直近営業日の日足の終値が空(null)のまま返すことがある。
+    # その日の取引が終わっていれば meta の regularMarketPrice（確定終値）で補う。
+    meta = res["meta"]
+    rmt, rmp = meta.get("regularMarketTime"), meta.get("regularMarketPrice")
+    end = (meta.get("currentTradingPeriod") or {}).get("regular", {}).get("end")
+    if rmt and rmp:
+        day = pd.Timestamp(rmt + off, unit="s").normalize()
+        closed = time.time() >= (end if end and end > rmt else rmt + 1800)
+        if closed and (day not in df.index or pd.isna(df.at[day, "Close"])):
+            row = df.loc[day] if day in df.index else pd.Series(dtype=float)
+            df.loc[day, "Close"] = float(rmp)
+            df.loc[day, "Open"] = row.get("Open") if pd.notna(row.get("Open", np.nan)) else float(rmp)
+            df.loc[day, "High"] = meta.get("regularMarketDayHigh") or max(df.at[day, "Open"], rmp)
+            df.loc[day, "Low"] = meta.get("regularMarketDayLow") or min(df.at[day, "Open"], rmp)
+            vol = row.get("Volume", np.nan)
+            df.loc[day, "Volume"] = vol if pd.notna(vol) else (meta.get("regularMarketVolume") or 0.0)
+            df = df.sort_index()
+            print(f"[info] {ticker} {day.date()} の終値を meta から補完: {rmp}")
     time.sleep(1)
     return df.dropna(subset=["Close"])
 
@@ -420,6 +439,15 @@ def main() -> None:
     tickers = [TARGET, *CANDIDATES]
     prices = demo_prices(tickers) if args.demo else update_prices(tickers)
     nk = drop_incomplete_today(prices[TARGET])
+    if not args.demo:
+        # 判定日 = 今日（東証営業日の朝）。基準日 = その前営業日の引値が揃っている必要がある
+        now = datetime.now(JST)
+        today = pd.Timestamp(now.date())
+        expected = (prev_or_same_business_day(today) if now.hour >= 16
+                    else prev_or_same_business_day(today - pd.Timedelta(days=1)))
+        if nk.index[-1] < expected:
+            raise SystemExit(f"[error] 日経平均の終値が {nk.index[-1].date()} までしか取得できていません"
+                             f"（必要: {expected.date()}）。判定日がずれるため予測を中止します")
     idx = nk.index
 
     # 1) 相関で使う市場を選ぶ（毎回選び直す）
