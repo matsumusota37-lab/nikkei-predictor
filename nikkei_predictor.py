@@ -165,6 +165,8 @@ def _fill_missing_recent(ticker: str, df: pd.DataFrame) -> pd.DataFrame:
     except Exception as e:
         print(f"[warn] {ticker} の5分足取得に失敗: {e}")
         return df
+    print(f"[info] {ticker} 日足に {expected.date()} の終値が無いため5分足を確認: "
+          f"{', '.join(f'{d.date()}={c:,.2f}' for d, c in add['Close'].items()) or 'データなし'}")
     if not df.empty:   # 日足に無い日・終値が空の日だけを補う（途中の欠けも対象）
         have = df.index[df["Close"].notna()]
         add = add[~add.index.isin(have) & (add.index > df.index[df.index <= expected].max() - pd.Timedelta(days=10))]
