@@ -158,15 +158,17 @@ def _fill_missing_recent(ticker: str, df: pd.DataFrame) -> pd.DataFrame:
     today = pd.Timestamp(now.date())
     expected = (prev_or_same_business_day(today) if now.hour >= 16
                 else prev_or_same_business_day(today - pd.Timedelta(days=1)))
-    if not df.empty and df.index.max() >= expected:
+    if not df.empty and expected in df.index and pd.notna(df.at[expected, "Close"]):
         return df
     try:
         add = _intraday_daily(ticker)
     except Exception as e:
         print(f"[warn] {ticker} の5分足取得に失敗: {e}")
         return df
-    add = add[~add.index.isin(df.index)] if not df.empty else add
-    add = add[add.index > (df.index.max() if not df.empty else pd.Timestamp.min)]
+    if not df.empty:   # 日足に無い日・終値が空の日だけを補う（途中の欠けも対象）
+        have = df.index[df["Close"].notna()]
+        add = add[~add.index.isin(have) & (add.index > df.index[df.index <= expected].max() - pd.Timedelta(days=10))]
+        df = df[~df.index.isin(add.index)]
     add = add[[not is_tse_holiday(d) for d in add.index]]
     if not add.empty:
         print(f"[info] {ticker} の日足に無い {', '.join(str(d.date()) for d in add.index)} を5分足から補完"
