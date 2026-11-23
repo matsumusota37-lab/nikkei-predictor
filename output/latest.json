@@ -2,7 +2,7 @@
   "base_date": "2026-11-20",
   "judge_date": "2026-11-24",
   "target_date": "2026-11-25",
-  "prob_up": 0.4105466717445671,
+  "prob_up": 0.410546671744566,
   "direction": "下落",
   "model": "ロジスティック回帰",
   "markets": [
